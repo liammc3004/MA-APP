@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Music Assistant</string>
+    <string name="server_url_hint">Server URL</string>
+    <string name="server_token_hint">Access token</string>
+    <string name="connect">Connect</string>
+    <string name="players">Players</string>
+    <string name="now_playing">Now Playing</string>
+    <string name="queue">Queue</string>
+    <string name="search">Search</string>
+</resources>
