@@ -47,6 +47,26 @@ data class PlayerQueue(
 )
 
 @Serializable
+data class SearchResult(
+    val itemId: String,
+    val title: String,
+    val artist: String? = null,
+    val album: String? = null,
+    val artwork: String? = null,
+    val durationMs: Long? = null
+)
+
+@Serializable
+data class SearchResponse(
+    val items: List<SearchResult>
+)
+
+@Serializable
+data class AddToQueueRequest(
+    val itemId: String
+)
+
+@Serializable
 sealed interface SocketEvent {
     val type: String
 }
