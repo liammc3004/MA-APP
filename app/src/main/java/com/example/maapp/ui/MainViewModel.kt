@@ -8,8 +8,10 @@ import com.example.maapp.data.SettingsRepository
 import com.example.maapp.network.MaNetworkModule
 import com.example.maapp.network.Player
 import com.example.maapp.network.PlayerQueue
+import com.example.maapp.network.SearchResult
 import com.example.maapp.network.ServerConfig
 import com.example.maapp.network.WebSocketUpdate
+import com.example.maapp.network.AddToQueueRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -90,6 +92,58 @@ class MainViewModel(
     fun currentPlayer(): Player? = uiState.value.players.firstOrNull { it.playerId == uiState.value.currentPlayerId }
 
     fun currentQueue(): PlayerQueue? = uiState.value.queues.firstOrNull { it.playerId == uiState.value.currentPlayerId }
+
+    fun updateSearchQuery(query: String) {
+        _uiState.update { it.copy(searchQuery = query) }
+    }
+
+    fun performSearch() {
+        val query = uiState.value.searchQuery.takeIf { it.isNotBlank() } ?: return
+        val service = networkModule.retrofitService()
+        if (service == null) {
+            _uiState.update { it.copy(statusMessage = "Configure server before searching") }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSearching = true) }
+            runCatching { service.search(query) }
+                .onSuccess { response ->
+                    _uiState.update { it.copy(searchResults = response.items, isSearching = false) }
+                }
+                .onFailure { throwable ->
+                    _uiState.update {
+                        it.copy(
+                            isSearching = false,
+                            statusMessage = "Search failed: ${throwable.message}"
+                        )
+                    }
+                }
+        }
+    }
+
+    fun addToQueue(item: SearchResult) {
+        val playerId = uiState.value.currentPlayerId
+        if (playerId == null) {
+            _uiState.update { it.copy(statusMessage = "Select a player first") }
+            return
+        }
+        val service = networkModule.retrofitService()
+        if (service == null) {
+            _uiState.update { it.copy(statusMessage = "Configure server before adding to queue") }
+            return
+        }
+
+        viewModelScope.launch {
+            runCatching { service.addToQueue(playerId, AddToQueueRequest(item.itemId)) }
+                .onSuccess {
+                    _uiState.update { it.copy(statusMessage = "Added ${item.title} to queue") }
+                    playerRepository.refreshFromHttp()
+                }
+                .onFailure { throwable ->
+                    _uiState.update { it.copy(statusMessage = "Failed to add: ${throwable.message}") }
+                }
+        }
+    }
 }
 
 class MainViewModelFactory(
@@ -110,5 +164,8 @@ data class UiState(
     val players: List<Player> = emptyList(),
     val queues: List<PlayerQueue> = emptyList(),
     val currentPlayerId: String? = null,
-    val statusMessage: String? = null
+    val statusMessage: String? = null,
+    val searchQuery: String = "",
+    val searchResults: List<SearchResult> = emptyList(),
+    val isSearching: Boolean = false
 )
